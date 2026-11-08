@@ -1,9 +1,14 @@
-use std::{collections::HashSet, path::Path, sync::mpsc, time::Instant};
+use std::{
+    collections::HashSet,
+    path::Path,
+    sync::mpsc,
+    time::{Duration, Instant},
+};
 
 use color_eyre::Result;
 use gpui::{
     App, Application, Bounds, Context, Hsla, SharedString, TitlebarOptions, Window, WindowBounds,
-    WindowOptions, div, prelude::*, px, rgb, size, transparent_black,
+    WindowOptions, black, div, prelude::*, px, rgb, size, transparent_black,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, de};
@@ -129,6 +134,7 @@ enum Message {
 }
 
 const FLOOR_INSET: f32 = 80.0;
+const FRAME: Duration = Duration::from_millis(16);
 
 struct KeyVisualizer {
     config: Config,
@@ -151,10 +157,58 @@ impl KeyVisualizer {
     fn new(config: Config, cx: &mut Context<Self>) -> Self {
         let (tx, rx) = mpsc::channel::<Message>();
 
+        Self::spawn_key_listener(cx, tx);
+        Self::spawn_update_loop(cx);
+
         Self {
             config,
             rx,
             held: HashSet::new(),
+        }
+    }
+
+    fn spawn_key_listener(cx: &mut Context<Self>, tx: mpsc::Sender<Message>) {
+        cx.background_executor()
+            .spawn(async move {
+                #[cfg(not(target_os = "linux"))]
+                let result = listen_rdev(tx);
+
+                if let Err(e) = result {
+                    eprintln!("Keyboard listener failed: {e:?}");
+                }
+            })
+            .detach();
+    }
+
+    fn spawn_update_loop(cx: &mut Context<Self>) {
+        cx.spawn(async move |this, cx| {
+            loop {
+                cx.background_executor().timer(FRAME).await;
+
+                let result = this.update(cx, |this, cx| {
+                    this.process_keyevents();
+                    cx.notify();
+                });
+
+                if result.is_err() {
+                    break;
+                }
+            }
+        })
+        .detach()
+    }
+
+    fn process_keyevents(&mut self) {
+        while let Ok(msg) = self.rx.try_recv() {
+            match msg {
+                Message::Pressed { key, at } if self.held.insert(key) => {
+                    // start segment
+                }
+                Message::Released { key, at } if self.held.remove(&key) => {
+                    // close segment
+                }
+                _ => {} // Ignore duplicated events
+            }
         }
     }
 
@@ -170,9 +224,10 @@ impl KeyVisualizer {
                         key, color, text, ..
                     },
                 )| {
+                    let bg = self.config.bg;
                     let (bg, fg) = match self.held.contains(key) {
-                        true => (*color, transparent_black()),
-                        false => (transparent_black(), *color),
+                        true => (*color, bg),
+                        false => (bg, *color),
                     };
 
                     div()
@@ -194,6 +249,25 @@ impl KeyVisualizer {
             )
             .collect()
     }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn listen_rdev(tx: mpsc::Sender<Message>) -> Result<(), rdev::ListenError> {
+    rdev::listen(move |event| {
+        use rdev::EventType::*;
+
+        let at = Instant::now();
+
+        let msg = match event.event_type {
+            KeyPress(key) => Some(Message::Pressed { key, at }),
+            KeyRelease(key) => Some(Message::Released { key, at }),
+            _ => None,
+        };
+
+        if let Some(msg) = msg {
+            let _ = tx.send(msg);
+        }
+    })
 }
 
 fn main() {
