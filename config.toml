@@ -3,7 +3,7 @@ padding = 10.0
 size = 44.0
 
 [keys]
-KeyS = { color = "#ff0000" }
-KeyD = { color = "#ff0000" }
+S = { color = "#ff0000" }
+D = { color = "#ff0000" }
 SemiColon = { color = "#0000ff", text = ";" }
 Quote = { color = "#0000ff", text = "'" }

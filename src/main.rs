@@ -8,7 +8,7 @@ use std::{
 use color_eyre::Result;
 use gpui::{
     App, Application, Bounds, Context, Hsla, TitlebarOptions, Window, WindowBounds, WindowOptions,
-    black, div, prelude::*, px, size,
+    black, div, prelude::*, px, size, white,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, de};
@@ -59,14 +59,82 @@ fn default_bg() -> Hsla {
     black()
 }
 
+const ALIASES: &[(&str, &str, &str)] = &[
+    ("esc", "Escape", "KEY_ESC"),
+    ("escape", "Escape", "KEY_ESC"),
+    ("enter", "Return", "KEY_ENTER"),
+    ("return", "Return", "KEY_ENTER"),
+    ("left", "LeftArrow", "KEY_LEFT"),
+    ("right", "RightArrow", "KEY_RIGHT"),
+    ("up", "UpArrow", "KEY_UP"),
+    ("down", "DownArrow", "KEY_DOWN"),
+    ("altgr", "AltGr", "KEY_RIGHTALT"),
+    ("printscreen", "PrintScreen", "KEY_SYSRQ"),
+    ("semicolon", "SemiColon", "SEMICOLON"),
+];
+
+fn resolve_key_name(name: &str) -> (String, String) {
+    let find_aliases = |name, normalized| {
+        ALIASES
+            .iter()
+            .find(|(alias, r, ev)| normalized == *alias || name == *r || name == *ev)
+    };
+
+    let normalized = name
+        .trim()
+        .trim_prefix("KEY_")
+        .trim_prefix("Key")
+        .to_lowercase();
+
+    if let Some((_, rdev, evdev)) = find_aliases(name, &normalized) {
+        return (rdev.to_string(), evdev.to_string());
+    }
+
+    let (rdev, evdev) = match normalized.as_bytes() {
+        [letter] if letter.is_ascii_alphabetic() => {
+            let letter = normalized.to_ascii_uppercase();
+            (format!("Key{letter}"), normalized.to_string())
+        }
+        [digit] if digit.is_ascii_digit() => (format!("Num{normalized}"), normalized.to_string()),
+        _ => match normalized.strip_prefix("f") {
+            Some(function) => (format!("F{function}"), format!("F{function}")),
+            None => {
+                let mut chars = normalized.chars();
+                let rdev = chars
+                    .next()
+                    .map(|first| {
+                        first.to_ascii_uppercase().to_string()
+                            + &chars.as_str().to_ascii_lowercase()
+                    })
+                    .unwrap_or_default();
+
+                let evdev = normalized.to_uppercase();
+
+                (rdev, evdev)
+            }
+        },
+    };
+
+    (rdev, format!("KEY_{evdev}"))
+}
+
+#[cfg(target_os = "linux")]
+fn parse_config_key(name: &str) -> Option<Key> {
+    use std::str::FromStr;
+
+    let (_, evdev) = resolve_key_name(name);
+    evdev::KeyCode::from_str(evdev).ok()
+}
+
 #[cfg(not(target_os = "linux"))]
 fn parse_config_key(name: &str) -> Option<Key> {
     use serde::de::{
         IntoDeserializer,
-        value::{Error, StrDeserializer},
+        value::{Error, StringDeserializer},
     };
 
-    let de: StrDeserializer<Error> = name.into_deserializer();
+    let (rdev, _) = resolve_key_name(name);
+    let de: StringDeserializer<Error> = rdev.into_deserializer();
     rdev::Key::deserialize(de).ok()
 }
 
@@ -250,10 +318,11 @@ impl KeyVisualizer {
                         key, color, text, ..
                     },
                 )| {
-                    let bg = self.config.bg;
-                    let (bg, fg) = match self.held.contains(key) {
-                        true => (*color, bg),
-                        false => (bg, *color),
+                    let color_press = color.alpha(color.a / 1.618);
+
+                    let bg = match self.held.contains(key) {
+                        true => color_press,
+                        false => self.config.bg,
                     };
 
                     div()
@@ -269,7 +338,7 @@ impl KeyVisualizer {
                         .justify_center()
                         .text_xs()
                         .bg(bg)
-                        .text_color(fg)
+                        .text_color(white())
                         .child(text.clone())
                 },
             )
@@ -290,7 +359,7 @@ impl KeyVisualizer {
             .filter_map(|segment| {
                 let lane = self.lane_for_key(segment.key)?;
 
-                let input = &self.config.keys[lane];
+                let Input { color, .. } = &self.config.keys[lane];
                 let end = segment.end.unwrap_or(now);
 
                 let top = self.segment_top(segment.start, now);
@@ -304,7 +373,7 @@ impl KeyVisualizer {
                         .top(px(height - FLOOR_INSET - top))
                         .w(px(self.config.lane_width(lane)))
                         .h(px(bar_height))
-                        .bg(input.color),
+                        .bg(color.alpha(color.a / 1.618)),
                 )
             })
             .collect()
@@ -332,7 +401,6 @@ fn listen_rdev(tx: mpsc::Sender<Message>) -> Result<(), rdev::ListenError> {
 
 fn main() {
     let config = Config::load("config.toml");
-    println!("{config:?}");
     let config = config.unwrap();
 
     Application::new().run(|cx: &mut App| {
