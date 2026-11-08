@@ -7,8 +7,8 @@ use std::{
 
 use color_eyre::Result;
 use gpui::{
-    App, Application, Bounds, Context, Hsla, SharedString, TitlebarOptions, Window, WindowBounds,
-    WindowOptions, black, div, prelude::*, px, rgb, size, transparent_black,
+    App, Application, Bounds, Context, Hsla, TitlebarOptions, Window, WindowBounds, WindowOptions,
+    black, div, prelude::*, px, size,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, de};
@@ -56,7 +56,7 @@ fn default_height() -> f32 {
 }
 
 fn default_bg() -> Hsla {
-    gpui::opaque_grey(0.3, 1.0)
+    black()
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -128,6 +128,12 @@ impl Config {
     }
 }
 
+struct Segment {
+    key: Key,
+    start: Instant,
+    end: Option<Instant>,
+}
+
 enum Message {
     Pressed { key: Key, at: Instant },
     Released { key: Key, at: Instant },
@@ -135,10 +141,12 @@ enum Message {
 
 const FLOOR_INSET: f32 = 80.0;
 const FRAME: Duration = Duration::from_millis(16);
+const MIN_BAR_HEIGHT: f32 = 1.0;
 
 struct KeyVisualizer {
     config: Config,
     rx: mpsc::Receiver<Message>,
+    segments: Vec<Segment>,
     held: HashSet<Key>,
 }
 
@@ -148,8 +156,14 @@ impl Render for KeyVisualizer {
         let now = Instant::now();
 
         let labels = self.render_labels(height);
+        let segments = self.render_segments(now, height);
 
-        div().flex().size_full().bg(self.config.bg).children(labels)
+        div()
+            .flex()
+            .size_full()
+            .bg(self.config.bg)
+            .children(labels)
+            .children(segments)
     }
 }
 
@@ -163,6 +177,7 @@ impl KeyVisualizer {
         Self {
             config,
             rx,
+            segments: Vec::new(),
             held: HashSet::new(),
         }
     }
@@ -202,10 +217,21 @@ impl KeyVisualizer {
         while let Ok(msg) = self.rx.try_recv() {
             match msg {
                 Message::Pressed { key, at } if self.held.insert(key) => {
-                    // start segment
+                    self.segments.push(Segment {
+                        key,
+                        start: at,
+                        end: None,
+                    });
                 }
                 Message::Released { key, at } if self.held.remove(&key) => {
-                    // close segment
+                    if let Some(segment) = self
+                        .segments
+                        .iter_mut()
+                        .rev()
+                        .find(|s| s.key == key && s.end.is_none())
+                    {
+                        segment.end = Some(at);
+                    }
                 }
                 _ => {} // Ignore duplicated events
             }
@@ -247,6 +273,40 @@ impl KeyVisualizer {
                         .child(text.clone())
                 },
             )
+            .collect()
+    }
+
+    fn lane_for_key(&self, key: Key) -> Option<usize> {
+        self.config.keys.iter().position(|input| input.key == key)
+    }
+
+    fn segment_top(&self, segment_time: Instant, now: Instant) -> f32 {
+        now.duration_since(segment_time).as_secs_f32() * self.config.speed
+    }
+
+    fn render_segments(&self, now: Instant, height: f32) -> Vec<impl IntoElement> {
+        self.segments
+            .iter()
+            .filter_map(|segment| {
+                let lane = self.lane_for_key(segment.key)?;
+
+                let input = &self.config.keys[lane];
+                let end = segment.end.unwrap_or(now);
+
+                let top = self.segment_top(segment.start, now);
+                let bottom = self.segment_top(end, now) - 2.0;
+                let bar_height = (top - bottom).max(MIN_BAR_HEIGHT);
+
+                Some(
+                    div()
+                        .absolute()
+                        .left(px(self.config.lane_x(lane)))
+                        .top(px(height - FLOOR_INSET - top))
+                        .w(px(self.config.lane_width(lane)))
+                        .h(px(bar_height))
+                        .bg(input.color),
+                )
+            })
             .collect()
     }
 }
