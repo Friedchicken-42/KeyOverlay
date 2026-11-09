@@ -7,8 +7,7 @@ use std::{
 
 use color_eyre::Result;
 use gpui::{
-    App, Application, Bounds, Context, Hsla, TitlebarOptions, Window, WindowBounds, WindowOptions,
-    black, div, prelude::*, px, size, white,
+    App, Application, Bounds, Context, Hsla, TitlebarOptions, Window, WindowBounds, WindowOptions, black, div, linear_color_stop, linear_gradient, prelude::*, px, size, white,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, de};
@@ -223,8 +222,22 @@ impl Render for KeyVisualizer {
         let height = f32::from(window.viewport_size().height);
         let now = Instant::now();
 
+        self.drain_segments(now, height);
+
         let labels = self.render_labels(height);
         let segments = self.render_segments(now, height);
+
+        let fade = div()
+            .absolute()
+            .top_0()
+            .left_0()
+            .w_full()
+            .h(px(100.0))
+            .bg(linear_gradient(
+                180.0, 
+                linear_color_stop(self.config.bg, 0.0),
+                linear_color_stop(self.config.bg.opacity(0.0), 1.0)
+            ));
 
         div()
             .flex()
@@ -232,6 +245,7 @@ impl Render for KeyVisualizer {
             .bg(self.config.bg)
             .children(labels)
             .children(segments)
+            .child(fade)
     }
 }
 
@@ -304,6 +318,14 @@ impl KeyVisualizer {
                 _ => {} // Ignore duplicated events
             }
         }
+    }
+
+    fn drain_segments(&mut self, now: Instant, height: f32) {
+        let speed = self.config.speed;
+        let off_screen = Duration::from_secs_f32((height / speed).max(1.0) + 1.0);
+
+        self.segments
+            .retain(|s| s.end.is_none_or(|end| now.duration_since(end) < off_screen));
     }
 
     fn render_labels(&self, height: f32) -> Vec<impl IntoElement> {
