@@ -8,11 +8,11 @@ use std::{
 
 use color_eyre::Result;
 use gpui::{
-    App, Application, Bounds, Context, TitlebarOptions, Window, WindowBounds, WindowOptions, div,
-    linear_color_stop, linear_gradient, prelude::*, px, rgb, size, white,
+    App, Application, Bounds, Context, ExternalPaths, TitlebarOptions, Window, WindowBounds,
+    WindowOptions, div, linear_color_stop, linear_gradient, prelude::*, px, rgb, size, white,
 };
 
-use crate::config::{Config, ConfigStore, Input, Key};
+use crate::config::{ConfigStore, Input, Key, canonical};
 
 struct Segment {
     key: Key,
@@ -69,6 +69,7 @@ impl Render for KeyVisualizer {
             .children(segments)
             .child(fade)
             .children(error)
+            .on_drop(cx.listener(Self::drop_config))
     }
 }
 
@@ -246,6 +247,16 @@ impl KeyVisualizer {
                 .text_xs()
                 .child(format!("Config error: {msg}"))
         })
+    }
+
+    fn drop_config(&mut self, paths: &ExternalPaths, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(path) = paths.paths().first() else {
+            return;
+        };
+
+        let path = canonical(path);
+        self.config.reload(&path);
+        self.config.apply(window);
     }
 }
 

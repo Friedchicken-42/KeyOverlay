@@ -1,5 +1,5 @@
 use color_eyre::Result;
-use gpui::{Hsla, black, white};
+use gpui::{Hsla, Window, black, px, size, white};
 use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, de};
 use std::path::{Path, PathBuf};
@@ -216,7 +216,7 @@ fn is_toml(path: &Path) -> bool {
         .is_some_and(|ext| ext.eq_ignore_ascii_case("toml"))
 }
 
-fn canonical(path: &Path) -> PathBuf {
+pub fn canonical(path: &Path) -> PathBuf {
     path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
 }
 
@@ -241,17 +241,17 @@ pub struct ConfigStore {
 impl ConfigStore {
     pub fn new() -> Self {
         let dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        let path = latest_toml(&dir);
 
-        let (config, error) = match path {
-            Some(path) => match Config::load(&path) {
-                Ok(config) => (config, None),
-                Err(err) => (Config::default(), Some(format!("{err:#}"))),
-            },
-            None => (Config::default(), None),
+        let mut this = Self {
+            config: Config::default(),
+            error: None,
         };
 
-        Self { config, error }
+        if let Some(path) = latest_toml(&dir) {
+            this.reload(&path);
+        }
+
+        this
     }
 
     pub fn get(&self) -> &Config {
@@ -260,5 +260,27 @@ impl ConfigStore {
 
     pub fn error(&self) -> Option<&str> {
         self.error.as_deref()
+    }
+
+    pub fn reload(&mut self, path: &Path) {
+        if !is_toml(path) {
+            let name = path.file_name().unwrap_or(path.as_os_str());
+            self.error = Some(format!("{name:?} is not a TOML file"));
+            return;
+        }
+
+        match Config::load(path) {
+            Ok(config) => {
+                self.config = config;
+                self.error = None;
+            }
+            Err(e) => {
+                self.error = Some(format!("{e:#}"));
+            }
+        }
+    }
+
+    pub fn apply(&self, window: &mut Window) {
+        window.resize(size(px(self.config.total_width()), px(self.config.height)));
     }
 }
