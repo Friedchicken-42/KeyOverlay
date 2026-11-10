@@ -224,7 +224,7 @@ pub fn canonical(path: &Path) -> PathBuf {
     path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
 }
 
-fn latest_toml(dir: &Path) -> Option<PathBuf> {
+pub fn latest_toml(dir: &Path) -> Option<PathBuf> {
     std::fs::read_dir(dir)
         .ok()?
         .filter_map(|entry| entry.ok().map(|entry| entry.path()))

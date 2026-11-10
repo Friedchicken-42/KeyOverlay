@@ -13,7 +13,7 @@ use gpui::{
 };
 use notify::EventKind;
 
-use crate::config::{ConfigStore, Input, Key, canonical};
+use crate::config::{ConfigStore, Input, Key, canonical, latest_toml};
 
 struct Segment {
     key: Key,
@@ -158,7 +158,13 @@ impl KeyVisualizer {
 
             let path = match event.kind {
                 EventKind::Modify(_) => self.config.file.clone(),
-                // EventKind::Create(_) => {} // TODO
+                EventKind::Create(_)
+                    if let Some(dir) = self.config.file.parent()
+                        && let Some(path) = latest_toml(dir) =>
+                {
+                    path
+                }
+
                 _ => continue,
             };
 
