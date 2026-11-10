@@ -11,6 +11,7 @@ use gpui::{
     App, Application, Bounds, Context, ExternalPaths, TitlebarOptions, Window, WindowBounds,
     WindowOptions, div, linear_color_stop, linear_gradient, prelude::*, px, rgb, size, white,
 };
+use notify::EventKind;
 
 use crate::config::{ConfigStore, Input, Key, canonical};
 
@@ -42,6 +43,10 @@ impl Render for KeyVisualizer {
         let now = Instant::now();
 
         self.drain_segments(now, height);
+
+        if self.config.pending {
+            self.config.apply(window);
+        }
 
         let labels = self.render_labels(height);
         let segments = self.render_segments(now, height);
@@ -108,6 +113,7 @@ impl KeyVisualizer {
 
                 let result = this.update(cx, |this, cx| {
                     this.process_keyevents();
+                    this.poll_folder();
                     cx.notify();
                 });
 
@@ -141,6 +147,22 @@ impl KeyVisualizer {
                 }
                 _ => {} // Ignore duplicated events
             }
+        }
+    }
+
+    fn poll_folder(&mut self) {
+        while let Ok(event) = self.config.rx.try_recv() {
+            let Ok(event) = event else {
+                continue;
+            };
+
+            let path = match event.kind {
+                EventKind::Modify(_) => self.config.file.clone(),
+                // EventKind::Create(_) => {} // TODO
+                _ => continue,
+            };
+
+            self.config.load(&path);
         }
     }
 
@@ -249,13 +271,13 @@ impl KeyVisualizer {
         })
     }
 
-    fn drop_config(&mut self, paths: &ExternalPaths, window: &mut Window, cx: &mut Context<Self>) {
+    fn drop_config(&mut self, paths: &ExternalPaths, window: &mut Window, _cx: &mut Context<Self>) {
         let Some(path) = paths.paths().first() else {
             return;
         };
 
         let path = canonical(path);
-        self.config.reload(&path);
+        self.config.load(&path);
         self.config.apply(window);
     }
 }
@@ -299,7 +321,7 @@ fn main() {
                 is_resizable: false,
                 ..Default::default()
             },
-            move |window, cx| cx.new(|cx| KeyVisualizer::new(config, cx)),
+            move |_, cx| cx.new(|cx| KeyVisualizer::new(config, cx)),
         )
         .unwrap();
     });

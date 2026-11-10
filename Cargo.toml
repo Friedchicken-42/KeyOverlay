@@ -9,6 +9,7 @@ serde = { version = "1.0.229", features = ["derive"] }
 indexmap = { version = "2.14.2", features = ["serde"] }
 toml = { version = "1.1.8", features = [ "preserve_order" ] }
 color-eyre = "0.6.5"
+notify = "8.2.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 evdev = { version = "0.13", default-features = false }

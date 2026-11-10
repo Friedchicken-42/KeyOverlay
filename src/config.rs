@@ -1,8 +1,12 @@
 use color_eyre::Result;
 use gpui::{Hsla, Window, black, px, size, white};
 use indexmap::IndexMap;
+use notify::Watcher;
 use serde::{Deserialize, Deserializer, de};
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::mpsc,
+};
 
 #[cfg(target_os = "linux")]
 pub type Key = evdev::KeyCode;
@@ -236,19 +240,34 @@ fn latest_toml(dir: &Path) -> Option<PathBuf> {
 pub struct ConfigStore {
     config: Config,
     error: Option<String>,
+    watcher: Option<notify::RecommendedWatcher>,
+    pub rx: mpsc::Receiver<notify::Result<notify::Event>>,
+    pub file: PathBuf,
+    pub pending: bool,
 }
 
 impl ConfigStore {
     pub fn new() -> Self {
         let dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
+        let (tx, rx) = mpsc::channel();
+
+        let watcher = notify::recommended_watcher(tx).ok().map(|mut w| {
+            let _ = w.watch(&dir, notify::RecursiveMode::NonRecursive);
+            w
+        });
+
         let mut this = Self {
             config: Config::default(),
             error: None,
+            watcher,
+            rx,
+            file: PathBuf::new(),
+            pending: false,
         };
 
         if let Some(path) = latest_toml(&dir) {
-            this.reload(&path);
+            this.load(&path);
         }
 
         this
@@ -262,7 +281,7 @@ impl ConfigStore {
         self.error.as_deref()
     }
 
-    pub fn reload(&mut self, path: &Path) {
+    pub fn load(&mut self, path: &Path) {
         if !is_toml(path) {
             let name = path.file_name().unwrap_or(path.as_os_str());
             self.error = Some(format!("{name:?} is not a TOML file"));
@@ -271,6 +290,7 @@ impl ConfigStore {
 
         match Config::load(path) {
             Ok(config) => {
+                self.file = path.to_path_buf();
                 self.config = config;
                 self.error = None;
             }
@@ -278,9 +298,26 @@ impl ConfigStore {
                 self.error = Some(format!("{e:#}"));
             }
         }
+
+        self.update_watcher();
+        self.pending = true;
     }
 
-    pub fn apply(&self, window: &mut Window) {
+    pub fn apply(&mut self, window: &mut Window) {
         window.resize(size(px(self.config.total_width()), px(self.config.height)));
+        self.pending = false;
+    }
+
+    fn update_watcher(&mut self) {
+        let Some(ref mut watcher) = self.watcher else {
+            return;
+        };
+
+        let Some(dir) = self.file.parent() else {
+            return;
+        };
+
+        let _ = watcher.unwatch(dir);
+        let _ = watcher.watch(dir, notify::RecursiveMode::NonRecursive);
     }
 }
