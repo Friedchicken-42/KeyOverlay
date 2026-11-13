@@ -1,6 +1,2 @@
 target/
-
-
-# Added by cargo
-
-/target
+result/
