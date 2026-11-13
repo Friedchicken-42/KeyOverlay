@@ -55,17 +55,18 @@ fn default_bg() -> Hsla {
 }
 
 const ALIASES: &[(&str, &str, &str)] = &[
-    ("esc", "Escape", "KEY_ESC"),
-    ("escape", "Escape", "KEY_ESC"),
-    ("enter", "Return", "KEY_ENTER"),
-    ("return", "Return", "KEY_ENTER"),
-    ("left", "LeftArrow", "KEY_LEFT"),
-    ("right", "RightArrow", "KEY_RIGHT"),
-    ("up", "UpArrow", "KEY_UP"),
-    ("down", "DownArrow", "KEY_DOWN"),
-    ("altgr", "AltGr", "KEY_RIGHTALT"),
-    ("printscreen", "PrintScreen", "KEY_SYSRQ"),
+    ("esc", "Escape", "ESC"),
+    ("escape", "Escape", "ESC"),
+    ("enter", "Return", "ENTER"),
+    ("return", "Return", "ENTER"),
+    ("left", "LeftArrow", "LEFT"),
+    ("right", "RightArrow", "RIGHT"),
+    ("up", "UpArrow", "UP"),
+    ("down", "DownArrow", "DOWN"),
+    ("altgr", "AltGr", "RIGHTALT"),
+    ("printscreen", "PrintScreen", "SYSRQ"),
     ("semicolon", "SemiColon", "SEMICOLON"),
+    ("quote", "Quote", "APOSTROPHE"),
 ];
 
 pub fn resolve_key_name(name: &str) -> (String, String) {
@@ -82,13 +83,13 @@ pub fn resolve_key_name(name: &str) -> (String, String) {
         .to_lowercase();
 
     if let Some((_, rdev, evdev)) = find_aliases(name, &normalized) {
-        return (rdev.to_string(), evdev.to_string());
+        return (rdev.to_string(), format!("KEY_{evdev}"));
     }
 
     let (rdev, evdev) = match normalized.as_bytes() {
         [letter] if letter.is_ascii_alphabetic() => {
             let letter = normalized.to_ascii_uppercase();
-            (format!("Key{letter}"), normalized.to_string())
+            (format!("Key{letter}"), normalized.to_uppercase())
         }
         [digit] if digit.is_ascii_digit() => (format!("Num{normalized}"), normalized.to_string()),
         _ => match normalized.strip_prefix("f") {
@@ -118,7 +119,7 @@ fn parse_config_key(name: &str) -> Option<Key> {
     use std::str::FromStr;
 
     let (_, evdev) = resolve_key_name(name);
-    evdev::KeyCode::from_str(evdev).ok()
+    evdev::KeyCode::from_str(&evdev).ok()
 }
 
 #[cfg(not(target_os = "linux"))]

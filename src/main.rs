@@ -98,6 +98,8 @@ impl KeyVisualizer {
             .spawn(async move {
                 #[cfg(not(target_os = "linux"))]
                 let result = listen_rdev(tx);
+                #[cfg(target_os = "linux")]
+                let result = listen_evdev(tx);
 
                 if let Err(e) = result {
                     eprintln!("Keyboard listener failed: {e:?}");
@@ -305,6 +307,39 @@ fn listen_rdev(tx: mpsc::Sender<Message>) -> Result<(), rdev::ListenError> {
             let _ = tx.send(msg);
         }
     })
+}
+
+#[cfg(target_os = "linux")]
+fn listen_evdev(tx: mpsc::Sender<Message>) -> Result<()> {
+    use color_eyre::eyre::Context;
+    use evdev::*;
+
+    let mut device = Device::open("/dev/input/event0")
+        .context("Error reading /dev/input/event0, try adding yourself to the `input` group")?;
+
+    device.set_nonblocking(true)?;
+
+    loop {
+        let Ok(events) = device.fetch_events() else {
+            continue;
+        };
+
+        for event in events {
+            let EventSummary::Key(_, key, _) = event.destructure() else {
+                continue;
+            };
+
+            let at = Instant::now();
+
+            let msg = match event.value() {
+                1 => Message::Pressed { key, at },
+                0 => Message::Released { key, at },
+                _ => continue,
+            };
+
+            let _ = tx.send(msg);
+        }
+    }
 }
 
 fn main() {
