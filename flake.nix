@@ -29,21 +29,11 @@
           "rustfmt"
         ];
 
-        # runtimeLibs = with pkgs; [
-        #   # libxkbcommon
-        #   vulkan-loader
-        #   wayland
-        # ];
-
         libs = with pkgs; [
           fontconfig
           freetype
           libxkbcommon
           wayland
-          # libx11
-          # libxtst
-          # libxi
-          # libxext
           libxcb
           vulkan-loader
         ];
@@ -60,6 +50,26 @@
             export LD_LIBRARY_PATH="${nixpkgs.lib.makeLibraryPath libs}";
           '';
         };
+
+        packages.default =
+          (pkgs.makeRustPlatform {
+            cargo = toolchain;
+            rustc = toolchain;
+          }).buildRustPackage
+            {
+              pname = "KeyOverlay";
+              version = "0.1.0";
+              src = self;
+              cargoLock.lockFile = ./Cargo.lock;
+
+              nativeBuildInputs = with pkgs; [ pkg-config makeWrapper ];
+              buildInputs = libs;
+
+              postInstall = ''
+                wrapProgram $out/bin/KeyOverlay \
+                  --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath libs}"
+              '';
+            };
       }
     );
 }
