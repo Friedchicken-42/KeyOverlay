@@ -59,10 +59,16 @@
             {
               pname = "KeyOverlay";
               version = "0.1.0";
-              src = self;
+              src = pkgs.lib.cleanSourceWith {
+                src = self;
+                filter = path: _: baseNameOf path != "config.toml";
+              };
               cargoLock.lockFile = ./Cargo.lock;
 
-              nativeBuildInputs = with pkgs; [ pkg-config makeWrapper ];
+              nativeBuildInputs = with pkgs; [
+                pkg-config
+                makeWrapper
+              ];
               buildInputs = libs;
 
               postInstall = ''

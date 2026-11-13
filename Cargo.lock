@@ -3,6 +3,20 @@
 version = 4
 
 [[package]]
+name = "KeyOverlay"
+version = "0.1.0"
+dependencies = [
+ "color-eyre",
+ "evdev",
+ "gpui",
+ "indexmap",
+ "notify",
+ "rdev",
+ "serde",
+ "toml 1.2.1+spec-1.1.0",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3034,20 +3048,6 @@ dependencies = [
  "cfg-if",
  "futures-util",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "keyoverlay"
-version = "0.1.0"
-dependencies = [
- "color-eyre",
- "evdev",
- "gpui",
- "indexmap",
- "notify",
- "rdev",
- "serde",
- "toml 1.2.1+spec-1.1.0",
 ]
 
 [[package]]
