@@ -1,0 +1,12 @@
+speed = 200.0
+size = 44.0
+
+[keys]
+Z = { color = "#ffffff" }
+X = { color = "#00ffff" }
+C = { color = "#ffffff" }
+Space = { color = "#ffff00", width = 2 }
+M = { color = "#ffffff" }
+Comma = { color = "#00ffff", text = "," }
+Period = { color = "#ffffff", text = "." }
+
