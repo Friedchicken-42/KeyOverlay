@@ -32,7 +32,6 @@ pub struct Config {
     #[serde(deserialize_with = "deserialize_keys")]
     pub keys: Vec<Input>,
     pub speed: f32,
-    pub padding: f32,
     #[serde(default = "default_gap")]
     pub gap: f32,
     #[serde(default = "default_height")]
@@ -67,6 +66,7 @@ const ALIASES: &[(&str, &str, &str)] = &[
     ("printscreen", "PrintScreen", "SYSRQ"),
     ("semicolon", "SemiColon", "SEMICOLON"),
     ("quote", "Quote", "APOSTROPHE"),
+    ("period", "Dot", "DOT"),
 ];
 
 pub fn resolve_key_name(name: &str) -> (String, String) {
@@ -149,7 +149,6 @@ impl Default for Config {
         Self {
             keys,
             speed: 200.0,
-            padding: default_gap(),
             gap: default_gap(),
             height: default_height(),
             size: 44.0,
@@ -200,7 +199,7 @@ impl Config {
             .iter()
             .map(|key| key.hitbox_width(self.size) + self.gap)
             .sum::<f32>()
-            .max(self.gap)
+            + self.gap
     }
 
     pub fn lane_x(&self, lane: usize) -> f32 {
@@ -208,7 +207,7 @@ impl Config {
             .iter()
             .map(|key| key.hitbox_width(self.size) + self.gap)
             .sum::<f32>()
-            + self.padding
+            + self.gap
     }
 
     pub fn lane_width(&self, lane: usize) -> f32 {
@@ -216,7 +215,7 @@ impl Config {
     }
 }
 
-fn is_toml(path: &Path) -> bool {
+pub fn is_toml(path: &Path) -> bool {
     path.extension()
         .is_some_and(|ext| ext.eq_ignore_ascii_case("toml"))
 }
@@ -243,7 +242,7 @@ pub struct ConfigStore {
     error: Option<String>,
     watcher: Option<notify::RecommendedWatcher>,
     pub rx: mpsc::Receiver<notify::Result<notify::Event>>,
-    pub file: PathBuf,
+    pub dir: PathBuf,
     pub pending: bool,
 }
 
@@ -263,7 +262,7 @@ impl ConfigStore {
             error: None,
             watcher,
             rx,
-            file: PathBuf::new(),
+            dir: dir.clone(),
             pending: false,
         };
 
@@ -291,7 +290,6 @@ impl ConfigStore {
 
         match Config::load(path) {
             Ok(config) => {
-                self.file = path.to_path_buf();
                 self.config = config;
                 self.error = None;
             }
@@ -299,6 +297,11 @@ impl ConfigStore {
                 self.error = Some(format!("{e:#}"));
             }
         }
+
+        self.dir = path
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or(PathBuf::from("."));
 
         self.update_watcher();
         self.pending = true;
@@ -314,11 +317,7 @@ impl ConfigStore {
             return;
         };
 
-        let Some(dir) = self.file.parent() else {
-            return;
-        };
-
-        let _ = watcher.unwatch(dir);
-        let _ = watcher.watch(dir, notify::RecursiveMode::NonRecursive);
+        let _ = watcher.unwatch(&self.dir);
+        let _ = watcher.watch(&self.dir, notify::RecursiveMode::NonRecursive);
     }
 }
