@@ -1,7 +1,7 @@
 mod config;
 
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     sync::mpsc,
     time::{Duration, Instant},
 };
@@ -35,6 +35,7 @@ struct KeyVisualizer {
     rx: mpsc::Receiver<Message>,
     segments: Vec<Segment>,
     held: HashSet<Key>,
+    counters: HashMap<Key, usize>,
 }
 
 impl Render for KeyVisualizer {
@@ -48,11 +49,15 @@ impl Render for KeyVisualizer {
             self.config.apply(window);
         }
 
+        let config = self.config.get();
+
         let labels = self.render_labels(height);
         let segments = self.render_segments(now, height);
         let error = self.render_error();
-
-        let config = self.config.get();
+        let counters = match config.counter {
+            true => self.render_counters(height),
+            false => vec![],
+        };
 
         let fade = div()
             .absolute()
@@ -72,6 +77,7 @@ impl Render for KeyVisualizer {
             .bg(config.bg)
             .children(labels)
             .children(segments)
+            .children(counters)
             .child(fade)
             .children(error)
             .on_drop(cx.listener(Self::drop_config))
@@ -85,11 +91,14 @@ impl KeyVisualizer {
         Self::spawn_key_listener(cx, tx);
         Self::spawn_update_loop(cx);
 
+        let counters = config.get().keys.iter().map(|k| (k.key, 0)).collect();
+
         Self {
             config,
             rx,
             segments: Vec::new(),
             held: HashSet::new(),
+            counters,
         }
     }
 
@@ -131,6 +140,11 @@ impl KeyVisualizer {
         while let Ok(msg) = self.rx.try_recv() {
             match msg {
                 Message::Pressed { key, at } if self.held.insert(key) => {
+                    self.counters
+                        .entry(key)
+                        .and_modify(|v| *v += 1)
+                        .or_insert(0);
+
                     self.segments.push(Segment {
                         key,
                         start: at,
@@ -271,6 +285,30 @@ impl KeyVisualizer {
                 .text_xs()
                 .child(format!("Config error: {msg}"))
         })
+    }
+
+    fn render_counters(&self, height: f32) -> Vec<impl IntoElement> {
+        let config = self.config.get();
+
+        self.counters
+            .iter()
+            .flat_map(|(key, count)| {
+                let lane = config.keys.iter().position(|i| i.key == *key)?;
+
+                Some(
+                    div()
+                        .absolute()
+                        .left(px(config.lane_x(lane)))
+                        .top(px(height - FLOOR_INSET + config.size))
+                        .w(px(config.lane_width(lane)))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .text_color(white())
+                        .child(count.to_string()),
+                )
+            })
+            .collect()
     }
 
     fn drop_config(&mut self, paths: &ExternalPaths, window: &mut Window, _cx: &mut Context<Self>) {

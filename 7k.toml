@@ -1,5 +1,6 @@
 speed = 200.0
 size = 44.0
+counter = true
 
 [keys]
 Z = { color = "#ffffff" }

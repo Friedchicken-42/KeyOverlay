@@ -39,6 +39,8 @@ pub struct Config {
     pub size: f32,
     #[serde(default = "default_bg")]
     pub bg: Hsla,
+    #[serde(default)]
+    pub counter: bool,
 }
 
 fn default_gap() -> f32 {
@@ -153,6 +155,7 @@ impl Default for Config {
             height: default_height(),
             size: 44.0,
             bg: black(),
+            counter: true,
         }
     }
 }
