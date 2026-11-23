@@ -3,7 +3,7 @@
  A simple key overlay for osu! streaming
  
 Edit `config.toml` o create a new `*.toml` file to set your keymap
-# [Download Link](https://github.com/Friedchicken-42/KeyOverlay/releases/tag/v2.2)
+# [Download Link](https://github.com/Friedchicken-42/KeyOverlay/releases/tag/3.0)
 IF YOU ARE HAVING PROBLEMS WITH THE PROGRAM WHEN OSU! IS ON FULLSCREEN, TRY USING GAME CAPTURE INSTEAD OF WINDOW CAPTURE IN OBS!
 
 On NixOS:
