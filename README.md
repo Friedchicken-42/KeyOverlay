@@ -6,6 +6,11 @@ Edit `config.toml` o create a new `*.toml` file to set your keymap
 # [Download Link](https://github.com/Friedchicken-42/KeyOverlay/releases/tag/v2.2)
 IF YOU ARE HAVING PROBLEMS WITH THE PROGRAM WHEN OSU! IS ON FULLSCREEN, TRY USING GAME CAPTURE INSTEAD OF WINDOW CAPTURE IN OBS!
 
+On NixOS:
+```sh
+nix run github:Friedchicken-42/KeyOverlay
+```
+
 # config.toml properties
 ```toml
 # Required
