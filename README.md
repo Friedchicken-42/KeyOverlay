@@ -2,43 +2,39 @@
 # KeyOverlay
  A simple key overlay for osu! streaming
  
-Edit `config.ini` to set your keymap
+Edit `config.toml` o create a new `*.toml` file to set your keymap
 # [Download Link](https://github.com/Friedchicken-42/KeyOverlay/releases/tag/v2.2)
 IF YOU ARE HAVING PROBLEMS WITH THE PROGRAM WHEN OSU! IS ON FULLSCREEN, TRY USING GAME CAPTURE INSTEAD OF WINDOW CAPTURE IN OBS!
 
+# config.toml properties
+```toml
+# Required
+speed = 200.0   # Adjusts the speed at which the bars travel upwards.
+size = 44.0     # Changes the size of the key.
 
-# config.ini properties
-### General
+# Optional
+height = 700.0  # Sets the height of the window.
+gap = 18.0      # Adjusts the space between the keys.
+bg = "#000000"  # Sets the background color.
+counter = false # Shows the counter beneath each key.
 
-height - Used to set the height of the window.
+# List of keys to display, options: `{ color, width, text }`
+[keys]
+Z = { color = "#ffffff" } 
+X = { color = "#00ffff" }
+C = { color = "#ffffff" }
+# Custom width, otherwise defaults to 1
+Space = { color = "#ffff00", width = 2 }
+M = { color = "#ffffff" }
+# Custom text, otherwise uses the name
+Comma = { color = "#00ffff", text = "," }
+Period = { color = "#ffffff", text = "." }
+```
 
-keySize - Changes the size of the key (excluding border).
-
-barSpeed - Adjusts the speed at which the bars travel upwards.
-
-backgroundColor - Changes the color of the background.
-
-margin - Adjusts the margin of the keys from the sides.
-
-outlineThickness - Changes the thickness of a square border.
-
-fading - yes/no - Adds/removes the fading effect on top.
-
-counter - yes/no - Adds a keycounter beneath each key that counts total clicks in a session.
-
-fps - Sets the target FPS for the program to run.
-
-### Keys
-key1, key2 ... - Keys the program should use (UPPERCASE), for numbers and symbols [please refer to this table](https://www.sfml-dev.org/documentation/2.5.1/classsf_1_1Keyboard.php#acb4cacd7cc5802dec45724cf3314a142), for mouse buttons add m before the [mouse button options](https://www.sfml-dev.org/documentation/2.5.1/classsf_1_1Mouse.php#a4fb128be433f9aafe66bc0c605daaa90) ex. mLeft mRight. If you want more keys just add more fields.
-
-### Display
-key1, key2, ... - If the name of the key you are using is too large, or you would like to use a different symbol, you can use this property to override the original key name that is going to be displayed.
-
-### Colors
-key1, key2, ... - Use a custom color for the key instead of white.
-
-### Size
-key1, key2, ... - Use a custom width for the key
+# Improvements
+- Automatically loads the most recent `*.toml` file
+- Supports dropping config files in the window
+- Reloads when the config is edited
 
 # Preview
 ![](https://imgur.com/JJOrZUt.gif)
