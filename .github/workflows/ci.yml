@@ -49,4 +49,6 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: KeyOverlay-${{ matrix.os }}
-        path: target/release
+        path: |
+          target/release/KeyOverlay
+          target/release/KeyOverlay.exe
