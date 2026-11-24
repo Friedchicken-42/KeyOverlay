@@ -1,0 +1,43 @@
+name: Builder
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+    - ".gitignore"
+    - "LICENSE"
+    - "README.md"
+    - "*.toml"
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+    - ".gitignore"
+    - "LICENSE"
+    - "README.md"
+    - "*.toml"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ "windows-latest", "ubuntu-latest" ]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@nightly
+
+    - name: Cache
+      uses: Swatinem/rust-cache@v2
+
+    - name: Build
+      run: cargo build --release
+
+    - name: Upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: KeyOverlay-${{ matrix.os }}
+        path: target/release
